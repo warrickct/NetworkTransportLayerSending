@@ -1,0 +1,16 @@
+# Unity generated
+Builds/
+_Builds/
+Temp/
+Library/
+
+# Visual Studio / MonoDevelop generated
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.userprefs
+.vs
+
+# OS generated
+.DS_Store
