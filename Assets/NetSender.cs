@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
+using System;
 
 public class NetSender : MonoBehaviour {
 
     public Text inputText;
     public Text displayText;
+
+    public GameObject model;
 
     GlobalConfig gConfig;
 
@@ -107,5 +110,32 @@ public class NetSender : MonoBehaviour {
         string text = inputText.text;
         byte[] buffer = System.Text.Encoding.ASCII.GetBytes(text);
         SendData(buffer);
+    }
+
+    public void SendModel()
+    {
+        Mesh mesh = model.GetComponent<MeshFilter>().mesh;
+        Vector3[] vertices = mesh.vertices;
+        Vector2[] uvs = mesh.uv;
+        int[] triangles = mesh.triangles;
+
+        //todo: convert model data to byte[] then send as buffer.
+    }
+}
+
+[Serializable]
+public class ModelData
+{
+
+    //todo: convert to lists to be dynamically added.
+    public float[,,] vertices;
+    public float[,] uvs;
+    public int[] triangles;
+
+
+    //todo: loop through each array and add as you go.
+    public ModelData(Vector3[] verts, Vector2[] uvs, int[] tris)
+    {
+        //loop here
     }
 }
