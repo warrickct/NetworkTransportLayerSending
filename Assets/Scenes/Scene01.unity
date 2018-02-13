@@ -985,7 +985,7 @@ GameObject:
   - component: {fileID: 1456328950}
   - component: {fileID: 1456328949}
   m_Layer: 5
-  m_Name: Button (1)
+  m_Name: modelSendButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1050,7 +1050,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 1938275351}
-        m_MethodName: SendText
+        m_MethodName: SendModelData
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1199,6 +1199,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputText: {fileID: 2000202749}
   displayText: {fileID: 2088593884}
+  model: {fileID: 1967354654}
   port: 12345
   connectionTargetIp: 127.0.0.1
   connectionLimit: 10
@@ -1226,6 +1227,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b05012b00dca284686a742744712c98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &1967354654 stripped
+GameObject:
+  m_PrefabParentObject: {fileID: 100062, guid: 5975bb78a1ac2054abbbf55ceda71ee7, type: 3}
+  m_PrefabInternal: {fileID: 592970314}
 --- !u!1 &2000202747
 GameObject:
   m_ObjectHideFlags: 0

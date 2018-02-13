@@ -4,6 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
 using System;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.IO;
+using System.Linq;
 
 public class NetSender : MonoBehaviour {
 
@@ -22,14 +25,13 @@ public class NetSender : MonoBehaviour {
     int connectionId;
     int myReliableChannelId;
     int myUnreliableChannelId;
+    int myReliableFragmentedChannelId;
 
-    // Use this for initialization
     void Start () {
         StartHost();
         ConnectToHost();
 	}
 	
-	// Update is called once per frame
 	void Update () {
         ReceiveData();
         //Debug.Log("connection id: " + connectionId);
@@ -39,15 +41,20 @@ public class NetSender : MonoBehaviour {
     {
         // Init Transport using default values.
         NetworkTransport.Init();
-
+        
         // Create a connection config and add a Channel.
         ConnectionConfig config = new ConnectionConfig();
+        config.MaxCombinedReliableMessageSize = 300;
+
+        //Creating channels
         myReliableChannelId = config.AddChannel(QosType.Reliable);
+        myUnreliableChannelId = config.AddChannel(QosType.Unreliable);
+        myReliableFragmentedChannelId = config.AddChannel(QosType.ReliableFragmented);
 
         // Create a topology based on the connection config.
         HostTopology topology = new HostTopology(config, 10);
 
-        // Create a host based on the topology we just created, and bind the socket to port 12345.
+        // Create a host based on the topology we just created, and bind the socket to port in inspector.
         hostId = NetworkTransport.AddHost(topology, port);
     }
 
@@ -60,8 +67,8 @@ public class NetSender : MonoBehaviour {
     void SendData(byte[] buffer)
     {
         byte error;
-        int bufferLength = buffer.Length;
-        NetworkTransport.Send(hostId, connectionId, myReliableChannelId, buffer, bufferLength, out error);
+        int bufferLength = 1024;
+        NetworkTransport.Send(hostId, connectionId, myReliableFragmentedChannelId, buffer, bufferLength, out error);
     }
 
     void ReceiveData()
@@ -94,9 +101,7 @@ public class NetSender : MonoBehaviour {
 
     void DecodeData(byte[] buffer)
     {
-        string decodedData = System.Text.ASCIIEncoding.ASCII.GetString(buffer);
-        displayText.text = decodedData.ToUpper();
-        Debug.Log(decodedData.ToUpper());
+        
     }
 
     void Disconnect()
@@ -112,14 +117,26 @@ public class NetSender : MonoBehaviour {
         SendData(buffer);
     }
 
-    public void SendModel()
+    public void SendStart()
     {
-        Mesh mesh = model.GetComponent<MeshFilter>().mesh;
-        Vector3[] vertices = mesh.vertices;
-        Vector2[] uvs = mesh.uv;
-        int[] triangles = mesh.triangles;
 
-        //todo: convert model data to byte[] then send as buffer.
+    }
+
+    public void SendModelData()
+    {
+        //convert to serializable model data
+        Mesh mesh = model.GetComponent<MeshFilter>().mesh;
+        ModelData modelData = new ModelData(mesh.vertices, mesh.uv, mesh.triangles);
+
+        //convert serializable to byte array
+        MemoryStream ms = new MemoryStream();
+        BinaryFormatter bf = new BinaryFormatter();
+        bf.Serialize(ms, modelData);
+        byte[] data = ms.ToArray();
+
+        //send byte array
+        byte error;
+        NetworkTransport.Send(hostId, connectionId, myReliableFragmentedChannelId, data, data.Length, out error);
     }
 }
 
@@ -128,14 +145,53 @@ public class ModelData
 {
 
     //todo: convert to lists to be dynamically added.
-    public float[,,] vertices;
-    public float[,] uvs;
-    public int[] triangles;
-
+    public List<Vertex> verticesList = new List<Vertex>();
+    public List<UV> uvsList = new List<UV>();
+    public List<int> trisList = new List<int>();
 
     //todo: loop through each array and add as you go.
     public ModelData(Vector3[] verts, Vector2[] uvs, int[] tris)
     {
-        //loop here
+        // Iterate through vert, uv, triangle arrays, convert to convenience classes for listing to be serialized.
+        foreach(Vector3 v3 in verts)
+        {
+            Vertex vertex = new Vertex(v3);
+            verticesList.Add(vertex);
+        }
+        foreach (Vector2 v2 in uvs)
+        {
+            UV uv = new UV(v2);
+            uvsList.Add(uv);
+        }
+        foreach (int triangle in tris)
+        {
+            trisList.Add(triangle);
+        }
+        Debug.Log("model data construction done. Verts: " + verticesList.Count + " UVS: " + uvsList.Count + " triangles: " + trisList.Count);
+    }
+}
+
+[Serializable]
+public class Vertex
+{
+    public float vertX, vertY, vertZ;
+
+    public Vertex(Vector3 v3)
+    {
+        this.vertX = v3.x;
+        this.vertY = v3.y;
+        this.vertZ = v3.z;
+    }
+}
+
+[Serializable]
+public class UV
+{
+    public float uvX, uvY;
+
+    public UV(Vector2 v2)
+    {
+        this.uvX = v2.x;
+        this.uvY = v2.y;
     }
 }
