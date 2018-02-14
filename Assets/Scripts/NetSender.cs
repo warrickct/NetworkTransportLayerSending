@@ -96,7 +96,7 @@ public class NetSender : MonoBehaviour {
                 OnConnect(outHostId, outConnectionId, (NetworkError)error);
                 break;
             case NetworkEventType.DataEvent:
-                OnData(outHostId, outConnectionId, outChannelId, buffer, bufferSize, (NetworkError)error);
+                OnData(outHostId, outConnectionId, outChannelId, buffer, 65535, (NetworkError)error);
                 break;
             case NetworkEventType.DisconnectEvent:
                 if (outConnectionId == connectionId &&
@@ -128,9 +128,9 @@ public class NetSender : MonoBehaviour {
     /// Converts network data event buffer data into a usable object.
     /// </summary>
     /// <param name="buffer"></param>
-    void OnData(int hostId, int connectionId, int channelId, byte[] data, int size, NetworkError error)
+    void OnData(int recHostId, int recConnectionId, int recChannelId, byte[] recData, int recSize, NetworkError recError)
     {
-        
+
     }
 
     /// <summary>
@@ -158,46 +158,30 @@ public class NetSender : MonoBehaviour {
         Mesh mesh = model.GetComponent<MeshFilter>().mesh;
         ModelData modelData = new ModelData(mesh.vertices, mesh.uv, mesh.triangles);
 
-        //convert serializable to byte array
-        MemoryStream ms = new MemoryStream();
-        BinaryFormatter bf = new BinaryFormatter();
-        
-        //need to serialize to get size of model for receiving packet.
-        bf.Serialize(ms, modelData);
-        byte[] data = ms.ToArray();
-
-        //New data byte[] with additional size metadata.
-        /*
-        WireData wd = new WireData(data, data.Length);
-        bf.Serialize(ms, wd);
-        data = ms.ToArray();
-        */
+        MemoryStream memStream = new MemoryStream();
+        BinaryFormatter binFormatter = new BinaryFormatter();
+        binFormatter.Serialize(memStream, modelData);
+        byte[] data = memStream.ToArray();
 
         int chunkSize = 1024;
         int finalByteStartIndex = data.Length - (chunkSize - (data.Length % chunkSize));
         Debug.Log("Total data byte length" + data.Length);
         Debug.Log("final byte index" + finalByteStartIndex);
-        for (int i=0; i < data.Length; i++)
+        for (int i=0; i < data.Length; i+= chunkSize)
         {
             byte error;
-            if (i % 1024 == 0)
-            {
-                if (i == 0)
-                {
-                    byte[] startMsg = Encoding.ASCII.GetBytes("transmission start");
-                    NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, startMsg, startMsg.Length, out error);
-                }
-                byte[] chunk = data.Skip(i).Take(chunkSize).ToArray();
-                NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
-            }
-            else if (i == finalByteStartIndex)
+            byte[] chunk = data.Skip(i).Take(chunkSize).ToArray();
+            NetworkTransport.QueueMessageForSending(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
+            //NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
+            if (i == finalByteStartIndex)
             {
                 byte[] finalChunk = data.Skip(i).Take(data.Length - i).ToArray();
-                NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
-                byte[] endMsg = Encoding.ASCII.GetBytes("transmission end");
-                NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, endMsg, endMsg.Length, out error);
+                //NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
+                NetworkTransport.QueueMessageForSending(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
             }
         }
+        byte error;
+        NetworkTransport.SendQueuedMessages(hostId, connectionId, out error);
     }
 }
 
@@ -229,7 +213,7 @@ public class ModelData
     public List<UV> uvsList = new List<UV>();
     public List<int> trisList = new List<int>();
 
-    public int modelByteSize;
+    public long FullModelSize { get; set; }
 
     /// <summary>
     ///  Iterate through vert, uv, triangle arrays, convert to 
