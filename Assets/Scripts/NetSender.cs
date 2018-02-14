@@ -49,12 +49,12 @@ public class NetSender : MonoBehaviour {
         
         // Create a connection config and add a Channel.
         ConnectionConfig config = new ConnectionConfig();
-        config.FragmentSize = 1024;
 
         //Creating channels
         myReliableChannelId = config.AddChannel(QosType.Reliable);
         myUnreliableChannelId = config.AddChannel(QosType.Unreliable);
         myReliableFragmentedSequencedChannelId = config.AddChannel(QosType.ReliableFragmentedSequenced);
+        byte channelId = config.AddChannel(QosType.ReliableFragmentedSequenced);
 
         // Create a topology based on the connection config.
         HostTopology topology = new HostTopology(config, 10);
@@ -96,7 +96,8 @@ public class NetSender : MonoBehaviour {
                 OnConnect(outHostId, outConnectionId, (NetworkError)error);
                 break;
             case NetworkEventType.DataEvent:
-                OnData(outHostId, outConnectionId, outChannelId, buffer, 65535, (NetworkError)error);
+                Debug.Log(receiveSize);
+                OnData(outHostId, outConnectionId, outChannelId, buffer, bufferSize, (NetworkError)error);
                 break;
             case NetworkEventType.DisconnectEvent:
                 if (outConnectionId == connectionId &&
@@ -167,20 +168,20 @@ public class NetSender : MonoBehaviour {
         int finalByteStartIndex = data.Length - (chunkSize - (data.Length % chunkSize));
         Debug.Log("Total data byte length" + data.Length);
         Debug.Log("final byte index" + finalByteStartIndex);
+        byte error;
         for (int i=0; i < data.Length; i+= chunkSize)
         {
-            byte error;
+            
             byte[] chunk = data.Skip(i).Take(chunkSize).ToArray();
-            NetworkTransport.QueueMessageForSending(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
+            NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
             //NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
             if (i == finalByteStartIndex)
             {
                 byte[] finalChunk = data.Skip(i).Take(data.Length - i).ToArray();
                 //NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
-                NetworkTransport.QueueMessageForSending(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
+                NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
             }
         }
-        byte error;
         NetworkTransport.SendQueuedMessages(hostId, connectionId, out error);
     }
 }
