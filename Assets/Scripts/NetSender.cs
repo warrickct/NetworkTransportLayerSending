@@ -23,6 +23,8 @@ public class NetSender : MonoBehaviour {
     public string connectionTargetIp = "127.0.0.1";
     public int connectionLimit = 10;
 
+    const int ChunkSize = 1024;
+
     int hostId;
     int connectionId;
     int myModelSendingChannel;
@@ -65,7 +67,7 @@ public class NetSender : MonoBehaviour {
     void SendData(byte[] buffer)
     {
         byte error;
-        int bufferLength = 1024;
+        int bufferLength = ChunkSize;
         NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, buffer, bufferLength, out error);
     }
 
@@ -74,8 +76,8 @@ public class NetSender : MonoBehaviour {
         int outHostId;
         int outConnectionId;
         int outChannelId;
-        byte[] buffer = new byte[1024];
-        int bufferSize = 1024;
+        byte[] buffer = new byte[ChunkSize];
+        int bufferSize = ChunkSize;
         int receiveSize;
         byte error;
 
@@ -108,11 +110,33 @@ public class NetSender : MonoBehaviour {
         }
     }
 
+    byte[] totalBytes = new byte[0];
+
     void OnData(int recHostId, int recConnectionId, int recChannelId, byte[] recData, int recSize, NetworkError recError)
     {
-        byte[] data = recData;
-        string decodeString = ASCIIEncoding.ASCII.GetString(data);
-        displayText.text = decodeString.ToUpper();
+        if (recChannelId == myStringSendingChannel)
+        {
+            byte[] data = recData;
+            string decodeString = ASCIIEncoding.ASCII.GetString(data);
+            displayText.text = decodeString.ToUpper();
+        }
+        if (recChannelId == myModelSendingChannel)
+        {
+            totalBytes = Combine(totalBytes, recData);
+            Debug.Log(totalBytes.Length);
+            if (recSize < ChunkSize)
+            {
+                Debug.Log("End send, total bytes received: " + totalBytes);
+            }
+        }
+    }
+
+    public static byte[] Combine(byte[] first, byte[] second)
+    {
+        byte[] ret = new byte[first.Length + second.Length];
+        Buffer.BlockCopy(first, 0, ret, 0, first.Length);
+        Buffer.BlockCopy(second, 0, ret, first.Length, second.Length);
+        return ret;
     }
 
     void OnDisconnect(int hostId, int connectionId)
@@ -140,11 +164,29 @@ public class NetSender : MonoBehaviour {
         MemoryStream memStream = new MemoryStream();
         BinaryFormatter binFormatter = new BinaryFormatter();
         binFormatter.Serialize(memStream, modelData);
-        memStream.Dispose();
         byte[] data = memStream.ToArray();
+        memStream.Dispose();
 
-        byte error;
-        NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, data, data.Length, out error);
+        Debug.Log("Sending model of byte[] size: " + data.Length);
+
+        byte[] chunk;
+        int finalChunkSize = ChunkSize - (data.Length % ChunkSize);
+        Debug.Log("final chunk size" + finalChunkSize);
+        for (int i=0; i < data.Length; i += ChunkSize)
+        {
+            if (i + ChunkSize < data.Length)
+            {
+                chunk = data.Skip(i).Take(ChunkSize).ToArray();
+                Debug.Log("taking size: " + chunk.Length);
+            }
+            else
+            {
+                chunk = data.Skip(i).Take(data.Length - i).ToArray();
+                Debug.Log("taking size: " + chunk.Length);
+            }
+            byte error;
+            NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, chunk, chunk.Length, out error);
+        }
     }
 }
 
