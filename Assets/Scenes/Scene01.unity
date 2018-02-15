@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657868, g: 0.49641263, b: 0.57481706, a: 1}
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
@@ -973,6 +973,10 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &1330085952 stripped
+GameObject:
+  m_PrefabParentObject: {fileID: 100026, guid: 5975bb78a1ac2054abbbf55ceda71ee7, type: 3}
+  m_PrefabInternal: {fileID: 592970314}
 --- !u!1 &1456328947
 GameObject:
   m_ObjectHideFlags: 0
@@ -1199,7 +1203,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputText: {fileID: 2000202749}
   displayText: {fileID: 2088593884}
-  model: {fileID: 1967354654}
+  model: {fileID: 1330085952}
   port: 12345
   connectionTargetIp: 127.0.0.1
   connectionLimit: 10
@@ -1227,10 +1231,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b05012b00dca284686a742744712c98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1 &1967354654 stripped
-GameObject:
-  m_PrefabParentObject: {fileID: 100062, guid: 5975bb78a1ac2054abbbf55ceda71ee7, type: 3}
-  m_PrefabInternal: {fileID: 592970314}
 --- !u!1 &2000202747
 GameObject:
   m_ObjectHideFlags: 0

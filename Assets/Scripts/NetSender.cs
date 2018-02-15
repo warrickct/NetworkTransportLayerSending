@@ -25,9 +25,8 @@ public class NetSender : MonoBehaviour {
 
     int hostId;
     int connectionId;
-    int myReliableChannelId;
-    int myUnreliableChannelId;
-    int myReliableFragmentedSequencedChannelId;
+    int myModelSendingChannel;
+    int myStringSendingChannel;
 
     void Start () {
         StartHost();
@@ -38,10 +37,6 @@ public class NetSender : MonoBehaviour {
         ReceiveData();
 	}
 
-    /// <summary>
-    /// Initializes a network transport instance, sets up basic 
-    /// QoS channels, defines max connections for a host.
-    /// </summary>
     void StartHost()
     {
         // Init Transport using default values.
@@ -51,10 +46,8 @@ public class NetSender : MonoBehaviour {
         ConnectionConfig config = new ConnectionConfig();
 
         //Creating channels
-        myReliableChannelId = config.AddChannel(QosType.Reliable);
-        myUnreliableChannelId = config.AddChannel(QosType.Unreliable);
-        myReliableFragmentedSequencedChannelId = config.AddChannel(QosType.ReliableFragmentedSequenced);
-        byte channelId = config.AddChannel(QosType.ReliableFragmentedSequenced);
+        myModelSendingChannel = config.AddChannel(QosType.ReliableFragmentedSequenced);
+        myStringSendingChannel = config.AddChannel(QosType.ReliableFragmentedSequenced);
 
         // Create a topology based on the connection config.
         HostTopology topology = new HostTopology(config, 10);
@@ -73,12 +66,9 @@ public class NetSender : MonoBehaviour {
     {
         byte error;
         int bufferLength = 1024;
-        NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, buffer, bufferLength, out error);
+        NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, buffer, bufferLength, out error);
     }
 
-    /// <summary>
-    /// Listens for network events on a network transport connection.
-    /// </summary>
     void ReceiveData()
     {
         int outHostId;
@@ -96,7 +86,6 @@ public class NetSender : MonoBehaviour {
                 OnConnect(outHostId, outConnectionId, (NetworkError)error);
                 break;
             case NetworkEventType.DataEvent:
-                Debug.Log(receiveSize);
                 OnData(outHostId, outConnectionId, outChannelId, buffer, bufferSize, (NetworkError)error);
                 break;
             case NetworkEventType.DisconnectEvent:
@@ -109,12 +98,6 @@ public class NetSender : MonoBehaviour {
         }
     }
 
-    /// <summary>
-    /// Checks host and connection id are correct
-    /// </summary>
-    /// <param name="outHostId"></param>
-    /// <param name="outConnectionId"></param>
-    /// <param name="error"></param>
     void OnConnect(int outHostId, int outConnectionId, NetworkError error)
     {
         if (outHostId == hostId &&
@@ -125,18 +108,13 @@ public class NetSender : MonoBehaviour {
         }
     }
 
-    /// <summary>
-    /// Converts network data event buffer data into a usable object.
-    /// </summary>
-    /// <param name="buffer"></param>
     void OnData(int recHostId, int recConnectionId, int recChannelId, byte[] recData, int recSize, NetworkError recError)
     {
-
+        byte[] data = recData;
+        string decodeString = ASCIIEncoding.ASCII.GetString(data);
+        displayText.text = decodeString.ToUpper();
     }
 
-    /// <summary>
-    /// Disconnects network transport connection
-    /// </summary>
     void OnDisconnect(int hostId, int connectionId)
     {
         byte error;
@@ -147,63 +125,29 @@ public class NetSender : MonoBehaviour {
     {
         string text = inputText.text;
         byte[] buffer = Encoding.ASCII.GetBytes(text);
-        SendData(buffer);
+
+        byte error;
+        NetworkTransport.Send(hostId, connectionId, myStringSendingChannel, buffer, buffer.Length, out error);
     }
 
-    /// <summary>
-    /// Converts a model vert, uv, triangles into byte[] and sends across network in chunks.
-    /// </summary>
     public void SendModelData()
     {
-        //convert to serializable model data
+        //Extract model mesh properties, convert to serializable model data
         Mesh mesh = model.GetComponent<MeshFilter>().mesh;
         ModelData modelData = new ModelData(mesh.vertices, mesh.uv, mesh.triangles);
 
+        //convert to byte array
         MemoryStream memStream = new MemoryStream();
         BinaryFormatter binFormatter = new BinaryFormatter();
         binFormatter.Serialize(memStream, modelData);
+        memStream.Dispose();
         byte[] data = memStream.ToArray();
 
-        int chunkSize = 1024;
-        int finalByteStartIndex = data.Length - (chunkSize - (data.Length % chunkSize));
-        Debug.Log("Total data byte length" + data.Length);
-        Debug.Log("final byte index" + finalByteStartIndex);
         byte error;
-        for (int i=0; i < data.Length; i+= chunkSize)
-        {
-            
-            byte[] chunk = data.Skip(i).Take(chunkSize).ToArray();
-            NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
-            //NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, chunk, chunk.Length, out error);
-            if (i == finalByteStartIndex)
-            {
-                byte[] finalChunk = data.Skip(i).Take(data.Length - i).ToArray();
-                //NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
-                NetworkTransport.Send(hostId, connectionId, myReliableFragmentedSequencedChannelId, finalChunk, finalChunk.Length, out error);
-            }
-        }
-        NetworkTransport.SendQueuedMessages(hostId, connectionId, out error);
+        NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, data, data.Length, out error);
     }
 }
 
-/*
-[Serializable]
-public class WireData
-{
-    public byte[] modelData;
-    public int modelSize;
-
-    public WireData(byte[] modelData, int size)
-    {
-        this.modelData = modelData;
-        this.modelSize = size;
-    }
-}
-*/
-
-/// <summary>
-/// Serializable class used for sending objects across a network.
-/// </summary>
 [Serializable]
 public class ModelData
 
@@ -214,15 +158,6 @@ public class ModelData
     public List<UV> uvsList = new List<UV>();
     public List<int> trisList = new List<int>();
 
-    public long FullModelSize { get; set; }
-
-    /// <summary>
-    ///  Iterate through vert, uv, triangle arrays, convert to 
-    ///  convenience classes for listing to be serialized.
-    /// </summary>
-    /// <param name="verts"></param>
-    /// <param name="uvs"></param>
-    /// <param name="tris"></param>
     public ModelData(Vector3[] verts, Vector2[] uvs, int[] tris)
     {
         foreach(Vector3 v3 in verts)
