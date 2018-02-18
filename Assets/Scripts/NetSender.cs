@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
@@ -7,7 +6,6 @@ using System;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
 using System.Text;
 
 public class NetSender : MonoBehaviour {
@@ -29,6 +27,8 @@ public class NetSender : MonoBehaviour {
     int connectionId;
     int myModelSendingChannel;
     int myStringSendingChannel;
+
+    BinaryFormatter bf = new BinaryFormatter();
 
     void Start () {
         StartHost();
@@ -88,7 +88,15 @@ public class NetSender : MonoBehaviour {
                 OnConnect(outHostId, outConnectionId, (NetworkError)error);
                 break;
             case NetworkEventType.DataEvent:
-                OnData(outHostId, outConnectionId, outChannelId, buffer, bufferSize, (NetworkError)error);
+                if (receiveSize < ChunkSize)
+                {
+                    byte[] smallerBuffer = new byte[receiveSize];
+                    OnData(outHostId, outConnectionId, outChannelId, smallerBuffer, smallerBuffer.Length, (NetworkError)error);
+                }
+                else
+                {
+                    OnData(outHostId, outConnectionId, outChannelId, buffer, bufferSize, (NetworkError)error);
+                }
                 break;
             case NetworkEventType.DisconnectEvent:
                 if (outConnectionId == connectionId &&
@@ -126,7 +134,9 @@ public class NetSender : MonoBehaviour {
             Debug.Log(totalBytes.Length);
             if (recSize < ChunkSize)
             {
-                Debug.Log("End send, total bytes received: " + totalBytes);
+                Debug.Log("End send, total bytes received: " + totalBytes.Length);
+                MemoryStream ms = new MemoryStream(totalBytes);
+                ModelData recModelData = (ModelData)bf.Deserialize(ms);
             }
         }
     }
@@ -158,31 +168,40 @@ public class NetSender : MonoBehaviour {
     {
         //Extract model mesh properties, convert to serializable model data
         Mesh mesh = model.GetComponent<MeshFilter>().mesh;
-        ModelData modelData = new ModelData(mesh.vertices, mesh.uv, mesh.triangles);
+        ModelData modelData = new ModelData();
+
+        foreach (Vector3 vert in mesh.vertices)
+        {
+            modelData.AddVertex(vert);
+        }
+        foreach (int triangle in mesh.triangles)
+        {
+            modelData.AddTriangle(triangle);
+        }
 
         //convert to byte array
-        MemoryStream memStream = new MemoryStream();
-        BinaryFormatter binFormatter = new BinaryFormatter();
-        binFormatter.Serialize(memStream, modelData);
-        byte[] data = memStream.ToArray();
-        memStream.Dispose();
+        
+        MemoryStream ms = new MemoryStream();
+        bf.Serialize(ms, modelData);
+        byte[] data = ms.ToArray();
 
-        Debug.Log("Sending model of byte[] size: " + data.Length);
+        //final byte calculations
+        Debug.Log("data  " + data.Length);
+        int finalSkipIndex = data.Length - (data.Length % ChunkSize);
+        Debug.Log("final byte index " + finalSkipIndex);
+        int finalTakeAmount = data.Length - finalSkipIndex;
+        Debug.Log("Final take amount " + finalTakeAmount);
 
-        byte[] chunk;
-        int finalChunkSize = ChunkSize - (data.Length % ChunkSize);
-        Debug.Log("final chunk size" + finalChunkSize);
-        for (int i=0; i < data.Length; i += ChunkSize)
+        for (int i = 0; i < data.Length; i+= ChunkSize)
         {
-            if (i + ChunkSize < data.Length)
+            byte[] chunk;
+            if (!i.Equals(finalSkipIndex))
             {
                 chunk = data.Skip(i).Take(ChunkSize).ToArray();
-                Debug.Log("taking size: " + chunk.Length);
             }
             else
             {
-                chunk = data.Skip(i).Take(data.Length - i).ToArray();
-                Debug.Log("taking size: " + chunk.Length);
+                chunk = data.Skip(i).Take(finalTakeAmount).ToArray();
             }
             byte error;
             NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, chunk, chunk.Length, out error);
@@ -192,55 +211,32 @@ public class NetSender : MonoBehaviour {
 
 [Serializable]
 public class ModelData
-
-    // TODO: Could refactor to make lists of arrays then no need for vert and uv class.
-    // will also make it easier to work with messagePack.
 {
-    public List<Vertex> verticesList = new List<Vertex>();
-    public List<UV> uvsList = new List<UV>();
-    public List<int> trisList = new List<int>();
+    [SerializeField]
+    public List<float[]> vertices = new List<float[]>();
 
-    public ModelData(Vector3[] verts, Vector2[] uvs, int[] tris)
+    [SerializeField]
+    public List<int> triangles = new List<int>();
+
+    [SerializeField]
+    public int verticesLength;
+
+    [SerializeField]
+    public int trianglesLength;
+
+    public void AddVertex(Vector3 vertex)
     {
-        foreach(Vector3 v3 in verts)
-        {
-            Vertex vertex = new Vertex(v3);
-            verticesList.Add(vertex);
-        }
-        foreach (Vector2 v2 in uvs)
-        {
-            UV uv = new UV(v2);
-            uvsList.Add(uv);
-        }
-        foreach (int triangle in tris)
-        {
-            trisList.Add(triangle);
-        }
-        Debug.Log("model data construction done. Verts: " + verticesList.Count + " UVS: " + uvsList.Count + " triangles: " + trisList.Count);
+        float[] f = {vertex.x, vertex.y, vertex.z };
+        vertices.Add(f);
     }
-}
 
-[Serializable]
-public class Vertex
-{
-    public float vertX, vertY, vertZ;
-
-    public Vertex(Vector3 v3)
+    public void AddTriangle(int triangle)
     {
-        this.vertX = v3.x;
-        this.vertY = v3.y;
-        this.vertZ = v3.z;
+        triangles.Add(triangle);
     }
-}
 
-[Serializable]
-public class UV
-{
-    public float uvX, uvY;
-
-    public UV(Vector2 v2)
+    public ModelData()
     {
-        this.uvX = v2.x;
-        this.uvY = v2.y;
+        
     }
 }
