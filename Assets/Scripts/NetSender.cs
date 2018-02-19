@@ -6,7 +6,6 @@ using System;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
 using System.Linq;
-using System.Text;
 
 public class NetSender : MonoBehaviour {
 
@@ -109,7 +108,7 @@ public class NetSender : MonoBehaviour {
         }
     }
 
-    List<byte> recBytes = new List<byte>();
+    List<byte> receivedBytes = new List<byte>();
     void OnData(int recHostId, int recConnectionId, int recChannelId, byte[] recData, int recSize, NetworkError recError)
     {
         if (recChannelId == myStringSendingChannel)
@@ -126,12 +125,12 @@ public class NetSender : MonoBehaviour {
         else if (recChannelId == myReliableSequencedChannelId)
         {
             List<byte> addBytes = new List<byte>(recData);
-            recBytes.AddRange(addBytes);
+            receivedBytes.AddRange(addBytes);
 
             //TODO: Will break if send a modelMeshData thats a multiple of 1024 bytes
             if (recSize < ChunkSize)
             {
-                byte[] totalData = recBytes.ToArray();
+                byte[] totalData = receivedBytes.ToArray();
                 BinaryFormatter bf = new BinaryFormatter();
                 MemoryStream ms = new MemoryStream(totalData);
                 ModelWireData meshWireData = bf.Deserialize(ms) as ModelWireData;
@@ -151,6 +150,7 @@ public class NetSender : MonoBehaviour {
                 int[] genTriangles = meshWireData.triangles;
                 Debug.Log(genTriangles.Length);
 
+                //creating mesh with the generated vertices and triangles
                 Mesh genMesh = new Mesh();
                 genMesh.vertices = genVertices;
                 genMesh.triangles = genTriangles;
@@ -218,6 +218,7 @@ public class NetSender : MonoBehaviour {
     }
 }
 
+//TODO: Add more properties to models to send.
 [Serializable]
 public class ModelWireData
 {
@@ -235,6 +236,8 @@ public class ModelWireData
 
     public ModelWireData(Vector3[] vertices, int[] triangles)
     {
+
+        //creating 2d float array for v3s
         this.vertices = new float[vertices.Length, 3];
         this.verticesLength = vertices.Length;
         for (int i=0; i < vertices.Length; i++)
@@ -244,6 +247,7 @@ public class ModelWireData
             this.vertices[i, 2] = vertices[i].z;
         }
 
+        //constructing int[]
         this.triangles = new int[triangles.Length];
         this.trianglesLength = triangles.Length;
         for (int i=0; i < triangles.Length; i++)
@@ -251,6 +255,7 @@ public class ModelWireData
             this.triangles = triangles;
         }
 
+        //confirmation constructor worked.
         Debug.Log(this.vertices.Length);
         Debug.Log(this.triangles.Length);
     }
