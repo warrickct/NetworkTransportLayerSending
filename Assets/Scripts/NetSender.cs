@@ -14,6 +14,7 @@ public class NetSender : MonoBehaviour {
     public Text displayText;
 
     public GameObject model;
+    public Material dummyMaterial;
 
     GlobalConfig gConfig;
 
@@ -127,15 +128,15 @@ public class NetSender : MonoBehaviour {
             List<byte> addBytes = new List<byte>(recData);
             recBytes.AddRange(addBytes);
 
+            //TODO: Will break if send a modelMeshData thats a multiple of 1024 bytes
             if (recSize < ChunkSize)
             {
                 byte[] totalData = recBytes.ToArray();
                 BinaryFormatter bf = new BinaryFormatter();
                 MemoryStream ms = new MemoryStream(totalData);
-                MeshWireData meshWireData = bf.Deserialize(ms) as MeshWireData;
+                ModelWireData meshWireData = bf.Deserialize(ms) as ModelWireData;
                 Debug.Log(meshWireData.verticesLength);
                 Debug.Log(meshWireData.trianglesLength);
-
 
                 //loop 2d float array, make into vectors and add to new vertices array
                 Vector3[] genVertices = new Vector3[meshWireData.verticesLength];
@@ -156,7 +157,8 @@ public class NetSender : MonoBehaviour {
                 GameObject genGo = new GameObject();
                 MeshFilter genGoMeshFilter = genGo.AddComponent<MeshFilter>();
                 genGoMeshFilter.mesh = genMesh;
-                genGo.AddComponent<MeshRenderer>();
+                MeshRenderer genGoMeshRenderer = genGo.AddComponent<MeshRenderer>();
+                genGoMeshRenderer.material = dummyMaterial;
             }
         }
     }
@@ -186,7 +188,7 @@ public class NetSender : MonoBehaviour {
         Debug.Log("local verts length" + mesh.vertices.Length);
         Debug.Log("local triangles length" + mesh.triangles.Length);
 
-        MeshWireData meshWireData = new MeshWireData(mesh.vertices, mesh.triangles);
+        ModelWireData meshWireData = new ModelWireData(mesh.vertices, mesh.triangles);
 
         byte[] data = Serialize(meshWireData);
 
@@ -217,7 +219,7 @@ public class NetSender : MonoBehaviour {
 }
 
 [Serializable]
-public class MeshWireData
+public class ModelWireData
 {
     [SerializeField]
     public int verticesLength;
@@ -231,7 +233,7 @@ public class MeshWireData
     [SerializeField]
     public int trianglesLength;
 
-    public MeshWireData(Vector3[] vertices, int[] triangles)
+    public ModelWireData(Vector3[] vertices, int[] triangles)
     {
         this.vertices = new float[vertices.Length, 3];
         this.verticesLength = vertices.Length;
