@@ -25,10 +25,8 @@ public class NetSender : MonoBehaviour {
 
     int hostId;
     int connectionId;
-    int myModelSendingChannel;
+    int myReliableSequencedChannelId;
     int myStringSendingChannel;
-
-    BinaryFormatter bf = new BinaryFormatter();
 
     void Start () {
         StartHost();
@@ -48,7 +46,7 @@ public class NetSender : MonoBehaviour {
         ConnectionConfig config = new ConnectionConfig();
 
         //Creating channels
-        myModelSendingChannel = config.AddChannel(QosType.ReliableFragmentedSequenced);
+        myReliableSequencedChannelId = config.AddChannel(QosType.ReliableSequenced);
         myStringSendingChannel = config.AddChannel(QosType.ReliableFragmentedSequenced);
 
         // Create a topology based on the connection config.
@@ -68,7 +66,7 @@ public class NetSender : MonoBehaviour {
     {
         byte error;
         int bufferLength = ChunkSize;
-        NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, buffer, bufferLength, out error);
+        NetworkTransport.Send(hostId, connectionId, myReliableSequencedChannelId, buffer, bufferLength, out error);
     }
 
     void ReceiveData()
@@ -88,15 +86,7 @@ public class NetSender : MonoBehaviour {
                 OnConnect(outHostId, outConnectionId, (NetworkError)error);
                 break;
             case NetworkEventType.DataEvent:
-                if (receiveSize < ChunkSize)
-                {
-                    byte[] smallerBuffer = new byte[receiveSize];
-                    OnData(outHostId, outConnectionId, outChannelId, smallerBuffer, smallerBuffer.Length, (NetworkError)error);
-                }
-                else
-                {
-                    OnData(outHostId, outConnectionId, outChannelId, buffer, bufferSize, (NetworkError)error);
-                }
+                OnData(outHostId, outConnectionId, outChannelId, buffer, receiveSize, (NetworkError)error);
                 break;
             case NetworkEventType.DisconnectEvent:
                 if (outConnectionId == connectionId &&
@@ -118,35 +108,57 @@ public class NetSender : MonoBehaviour {
         }
     }
 
-    byte[] totalBytes = new byte[0];
-
+    List<byte> recBytes = new List<byte>();
     void OnData(int recHostId, int recConnectionId, int recChannelId, byte[] recData, int recSize, NetworkError recError)
     {
         if (recChannelId == myStringSendingChannel)
         {
-            byte[] data = recData;
-            string decodeString = ASCIIEncoding.ASCII.GetString(data);
-            displayText.text = decodeString.ToUpper();
+            MemoryStream ms = new MemoryStream(recData);
+            BinaryFormatter bf = new BinaryFormatter();
+
+            Debug.Log("rec buffer length " + recData.Length);
+            string recText = bf.Deserialize(ms) as string;
+
+            Debug.Log(recText);
+            displayText.text = recText.ToUpper();
         }
-        if (recChannelId == myModelSendingChannel)
+        else if (recChannelId == myReliableSequencedChannelId)
         {
-            totalBytes = Combine(totalBytes, recData);
-            Debug.Log(totalBytes.Length);
+            List<byte> addBytes = new List<byte>(recData);
+            recBytes.AddRange(addBytes);
+
             if (recSize < ChunkSize)
             {
-                Debug.Log("End send, total bytes received: " + totalBytes.Length);
-                MemoryStream ms = new MemoryStream(totalBytes);
-                ModelData recModelData = (ModelData)bf.Deserialize(ms);
+                byte[] totalData = recBytes.ToArray();
+                BinaryFormatter bf = new BinaryFormatter();
+                MemoryStream ms = new MemoryStream(totalData);
+                MeshWireData meshWireData = bf.Deserialize(ms) as MeshWireData;
+                Debug.Log(meshWireData.verticesLength);
+                Debug.Log(meshWireData.trianglesLength);
+
+
+                //loop 2d float array, make into vectors and add to new vertices array
+                Vector3[] genVertices = new Vector3[meshWireData.verticesLength];
+                for (int i=0; i < meshWireData.verticesLength; i++)
+                {
+                    //0 = x, 1 = y, 2 = z
+                    genVertices[i] = new Vector3(meshWireData.vertices[i, 0], meshWireData.vertices[i, 1], meshWireData.vertices[i, 2]);
+                }
+                Debug.Log(genVertices.Length);
+
+                //assign received triangle array to genTriangles array
+                int[] genTriangles = meshWireData.triangles;
+                Debug.Log(genTriangles.Length);
+
+                Mesh genMesh = new Mesh();
+                genMesh.vertices = genVertices;
+                genMesh.triangles = genTriangles;
+                GameObject genGo = new GameObject();
+                MeshFilter genGoMeshFilter = genGo.AddComponent<MeshFilter>();
+                genGoMeshFilter.mesh = genMesh;
+                genGo.AddComponent<MeshRenderer>();
             }
         }
-    }
-
-    public static byte[] Combine(byte[] first, byte[] second)
-    {
-        byte[] ret = new byte[first.Length + second.Length];
-        Buffer.BlockCopy(first, 0, ret, 0, first.Length);
-        Buffer.BlockCopy(second, 0, ret, first.Length, second.Length);
-        return ret;
     }
 
     void OnDisconnect(int hostId, int connectionId)
@@ -158,7 +170,11 @@ public class NetSender : MonoBehaviour {
     public void SendText()
     {
         string text = inputText.text;
-        byte[] buffer = Encoding.ASCII.GetBytes(text);
+        MemoryStream ms = new MemoryStream();
+        BinaryFormatter bf = new BinaryFormatter();
+        bf.Serialize(ms, text);
+        byte[] buffer = ms.ToArray();
+        Debug.Log("send buffer length " + buffer.Length);
 
         byte error;
         NetworkTransport.Send(hostId, connectionId, myStringSendingChannel, buffer, buffer.Length, out error);
@@ -166,77 +182,76 @@ public class NetSender : MonoBehaviour {
 
     public void SendModelData()
     {
-        //Extract model mesh properties, convert to serializable model data
         Mesh mesh = model.GetComponent<MeshFilter>().mesh;
-        ModelData modelData = new ModelData();
+        Debug.Log("local verts length" + mesh.vertices.Length);
+        Debug.Log("local triangles length" + mesh.triangles.Length);
 
-        foreach (Vector3 vert in mesh.vertices)
+        MeshWireData meshWireData = new MeshWireData(mesh.vertices, mesh.triangles);
+
+        byte[] data = Serialize(meshWireData);
+
+        Debug.Log("data size " + data.Length);
+
+        int finalFragIndex = data.Length - (data.Length % ChunkSize);
+        byte[] fragment;
+        byte error;
+        for (int i = 0; i < finalFragIndex; i += ChunkSize)
         {
-            modelData.AddVertex(vert);
-        }
-        foreach (int triangle in mesh.triangles)
-        {
-            modelData.AddTriangle(triangle);
+            fragment = data.Skip(i).Take(ChunkSize).ToArray();
+            NetworkTransport.Send(hostId, connectionId, myReliableSequencedChannelId, fragment, fragment.Length, out error);
         }
 
-        //convert to byte array
-        
+        //final frag
+        fragment = data.Skip(finalFragIndex).Take(ChunkSize).ToArray();
+        NetworkTransport.Send(hostId, connectionId, myReliableSequencedChannelId, fragment, fragment.Length, out error);
+    }
+
+    public static byte[] Serialize<T>(T arg)
+    {
+        BinaryFormatter bf = new BinaryFormatter();
         MemoryStream ms = new MemoryStream();
-        bf.Serialize(ms, modelData);
+        bf.Serialize(ms, arg);
         byte[] data = ms.ToArray();
-
-        //final byte calculations
-        Debug.Log("data  " + data.Length);
-        int finalSkipIndex = data.Length - (data.Length % ChunkSize);
-        Debug.Log("final byte index " + finalSkipIndex);
-        int finalTakeAmount = data.Length - finalSkipIndex;
-        Debug.Log("Final take amount " + finalTakeAmount);
-
-        for (int i = 0; i < data.Length; i+= ChunkSize)
-        {
-            byte[] chunk;
-            if (!i.Equals(finalSkipIndex))
-            {
-                chunk = data.Skip(i).Take(ChunkSize).ToArray();
-            }
-            else
-            {
-                chunk = data.Skip(i).Take(finalTakeAmount).ToArray();
-            }
-            byte error;
-            NetworkTransport.Send(hostId, connectionId, myModelSendingChannel, chunk, chunk.Length, out error);
-        }
+        return data;
     }
 }
 
 [Serializable]
-public class ModelData
+public class MeshWireData
 {
-    [SerializeField]
-    public List<float[]> vertices = new List<float[]>();
-
-    [SerializeField]
-    public List<int> triangles = new List<int>();
-
     [SerializeField]
     public int verticesLength;
 
     [SerializeField]
+    public float[,] vertices;
+
+    [SerializeField]
+    public int[] triangles;
+
+    [SerializeField]
     public int trianglesLength;
 
-    public void AddVertex(Vector3 vertex)
+    public MeshWireData(Vector3[] vertices, int[] triangles)
     {
-        float[] f = {vertex.x, vertex.y, vertex.z };
-        vertices.Add(f);
-    }
+        this.vertices = new float[vertices.Length, 3];
+        this.verticesLength = vertices.Length;
+        for (int i=0; i < vertices.Length; i++)
+        {
+            this.vertices[i, 0] = vertices[i].x;
+            this.vertices[i, 1] = vertices[i].y;
+            this.vertices[i, 2] = vertices[i].z;
+        }
 
-    public void AddTriangle(int triangle)
-    {
-        triangles.Add(triangle);
-    }
+        this.triangles = new int[triangles.Length];
+        this.trianglesLength = triangles.Length;
+        for (int i=0; i < triangles.Length; i++)
+        {
+            this.triangles = triangles;
+        }
 
-    public ModelData()
-    {
-        
+        Debug.Log(this.vertices.Length);
+        Debug.Log(this.triangles.Length);
     }
 }
+
+
