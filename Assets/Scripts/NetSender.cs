@@ -133,32 +133,48 @@ public class NetSender : MonoBehaviour {
                 byte[] totalData = receivedBytes.ToArray();
                 BinaryFormatter bf = new BinaryFormatter();
                 MemoryStream ms = new MemoryStream(totalData);
-                ModelWireData meshWireData = bf.Deserialize(ms) as ModelWireData;
-                Debug.Log(meshWireData.verticesLength);
-                Debug.Log(meshWireData.trianglesLength);
+                ModelWireData modelWireData = bf.Deserialize(ms) as ModelWireData;
+                Debug.Log(modelWireData.verticesLength);
+                Debug.Log(modelWireData.trianglesLength);
 
                 //loop 2d float array, make into vectors and add to new vertices array
-                Vector3[] genVertices = new Vector3[meshWireData.verticesLength];
-                for (int i=0; i < meshWireData.verticesLength; i++)
+                Vector3[] genVertices = new Vector3[modelWireData.verticesLength];
+                for (int i=0; i < modelWireData.verticesLength; i++)
                 {
                     //0 = x, 1 = y, 2 = z
-                    genVertices[i] = new Vector3(meshWireData.vertices[i, 0], meshWireData.vertices[i, 1], meshWireData.vertices[i, 2]);
+                    genVertices[i] = new Vector3(modelWireData.vertices[i, 0], modelWireData.vertices[i, 1], modelWireData.vertices[i, 2]);
                 }
                 Debug.Log(genVertices.Length);
 
                 //assign received triangle array to genTriangles array
-                int[] genTriangles = meshWireData.triangles;
+                int[] genTriangles = modelWireData.triangles;
                 Debug.Log(genTriangles.Length);
 
                 //creating mesh with the generated vertices and triangles
                 Mesh genMesh = new Mesh();
                 genMesh.vertices = genVertices;
                 genMesh.triangles = genTriangles;
+
+                //calculating mesh properties for rendering purposes
+                genMesh.RecalculateNormals();
+                genMesh.RecalculateBounds();
+                genMesh.RecalculateTangents();
+
+                //Adding generated mesh to container game object
                 GameObject genGo = new GameObject();
                 MeshFilter genGoMeshFilter = genGo.AddComponent<MeshFilter>();
                 genGoMeshFilter.mesh = genMesh;
+
+                //Adding mesh renderer and assigning generated mesh to mesh renderer.
                 MeshRenderer genGoMeshRenderer = genGo.AddComponent<MeshRenderer>();
-                genGoMeshRenderer.material = dummyMaterial;
+
+                //Generate new empty material with standard shader.
+                Material genMaterial = genGoMeshRenderer.material = new Material(Shader.Find("Standard"));
+                //Generate colour from float array [r=0, g=1, b=2, g=3]
+                Color genColour = new Color(modelWireData.materialColour[0], modelWireData.materialColour[1], modelWireData.materialColour[2], modelWireData.materialColour[3]);
+                genMaterial.color = genColour;
+                genMaterial.SetFloat("_Glossiness", modelWireData.materialGlossiness);
+                genMaterial.SetFloat("_Metallic", modelWireData.materialMetallic);
             }
         }
     }
@@ -184,11 +200,18 @@ public class NetSender : MonoBehaviour {
 
     public void SendModelData()
     {
+        // Extracting mesh to use in constructor
         Mesh mesh = model.GetComponent<MeshFilter>().mesh;
         Debug.Log("local verts length" + mesh.vertices.Length);
         Debug.Log("local triangles length" + mesh.triangles.Length);
 
-        ModelWireData meshWireData = new ModelWireData(mesh.vertices, mesh.triangles);
+        // Extracting material settings/properties to use in constructor
+        Material material = model.GetComponent<MeshRenderer>().material;
+        float[] materialColour = { material.color.r, material.color.g, material.color.b, material.color.a };
+        float materialGlossiness = material.GetFloat("_Glossiness");
+        float materialMetallic= material.GetFloat("_Metallic");
+
+        ModelWireData meshWireData = new ModelWireData(mesh.vertices, mesh.triangles, materialColour, materialGlossiness, materialMetallic);
 
         byte[] data = Serialize(meshWireData);
 
@@ -222,6 +245,8 @@ public class NetSender : MonoBehaviour {
 [Serializable]
 public class ModelWireData
 {
+
+    //Mesh
     [SerializeField]
     public int verticesLength;
 
@@ -234,9 +259,17 @@ public class ModelWireData
     [SerializeField]
     public int trianglesLength;
 
-    public ModelWireData(Vector3[] vertices, int[] triangles)
-    {
 
+    //Material
+    [SerializeField]
+    public float[] materialColour;
+
+    [SerializeField]
+    public float materialGlossiness, materialMetallic;
+
+    public ModelWireData(Vector3[] vertices, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic)
+    {
+        //Mesh Parameters
         //creating 2d float array for v3s
         this.vertices = new float[vertices.Length, 3];
         this.verticesLength = vertices.Length;
@@ -258,6 +291,11 @@ public class ModelWireData
         //confirmation constructor worked.
         Debug.Log(this.vertices.Length);
         Debug.Log(this.triangles.Length);
+
+        //Material Parameters
+        this.materialColour = materialColour;
+        this.materialGlossiness = materialGlossiness;
+        this.materialMetallic = materialMetallic;
     }
 }
 
