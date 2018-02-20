@@ -175,8 +175,8 @@ public class NetSender : MonoBehaviour {
                 //Adding generated mesh to container game object
                 GameObject genGo = new GameObject
                 {
-                    name = "generatedModel",
-                    tag = "model",
+                    name = "GeneratedModel",
+                    tag = "Model",
                 };
                 MeshFilter genGoMeshFilter = genGo.AddComponent<MeshFilter>();
                 genGoMeshFilter.mesh = genMesh;
