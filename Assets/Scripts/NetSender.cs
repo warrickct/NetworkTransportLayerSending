@@ -144,7 +144,16 @@ public class NetSender : MonoBehaviour {
                     //0 = x, 1 = y, 2 = z
                     genVertices[i] = new Vector3(modelWireData.vertices[i, 0], modelWireData.vertices[i, 1], modelWireData.vertices[i, 2]);
                 }
-                Debug.Log(genVertices.Length);
+                Debug.Log("generated vertices length: " + genVertices.Length);
+
+                //loop through uvs into v2 array
+                Vector2[] genUvs = new Vector2[modelWireData.uvsLength];
+                for (int i = 0; i < modelWireData.uvsLength; i++)
+                {
+                    //0 = uv.x, 1 = uv.y
+                    genUvs[i] = new Vector2(modelWireData.uvs[i, 0], modelWireData.uvs[i, 1]);
+                }
+                Debug.Log("generated uv length: " + genUvs.Length);
 
                 //assign received triangle array to genTriangles array
                 int[] genTriangles = modelWireData.triangles;
@@ -154,6 +163,7 @@ public class NetSender : MonoBehaviour {
                 Mesh genMesh = new Mesh
                 {
                     vertices = genVertices,
+                    uv = genUvs,
                     triangles = genTriangles
                 };
 
@@ -190,6 +200,7 @@ public class NetSender : MonoBehaviour {
                 genTex2D.LoadRawTextureData(texBytes);
                 Debug.Log("generated texture" + genTex2D.width + " " + genTex2D.height);
                 genMaterial.mainTexture = genTex2D;
+                genTex2D.Apply();
             }
         }
     }
@@ -237,7 +248,7 @@ public class NetSender : MonoBehaviour {
         // ... mapping.
 
         //Construct modelWireData from the properties extracted.
-        ModelWireData modelWireData = new ModelWireData(mesh.vertices, mesh.triangles, materialColour, materialGlossiness, materialMetallic, textureData, textureWidth, textureHeight, textureFormat);
+        ModelWireData modelWireData = new ModelWireData(mesh.vertices, mesh.uv, mesh.triangles, materialColour, materialGlossiness, materialMetallic, textureData, textureWidth, textureHeight, textureFormat);
 
         byte[] data = Serialize(modelWireData);
 
@@ -274,17 +285,16 @@ public class ModelWireData
 
     //Mesh
     [SerializeField]
-    public int verticesLength;
+    public int verticesLength, trianglesLength, uvsLength;
 
     [SerializeField]
     public float[,] vertices;
 
     [SerializeField]
-    public int[] triangles;
+    public float[,] uvs;
 
     [SerializeField]
-    public int trianglesLength;
-
+    public int[] triangles;
 
     //Material
     [SerializeField]
@@ -299,7 +309,7 @@ public class ModelWireData
     [SerializeField]
     public int textureWidth, textureHeight, textureFormat;
 
-    public ModelWireData(Vector3[] vertices, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic, byte[] textureData, int textureWidth, int textureHeight, TextureFormat textureFormat)
+    public ModelWireData(Vector3[] vertices, Vector2[] uvs, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic, byte[] textureData, int textureWidth, int textureHeight, TextureFormat textureFormat)
     {
         //Mesh Parameters
         //creating 2d float array for v3s
@@ -310,6 +320,15 @@ public class ModelWireData
             this.vertices[i, 0] = vertices[i].x;
             this.vertices[i, 1] = vertices[i].y;
             this.vertices[i, 2] = vertices[i].z;
+        }
+
+        //constructing v2 uv[]
+        this.uvs = new float[uvs.Length, 2];
+        this.uvsLength = uvs.Length;
+        for (int i=0; i < uvs.Length; i++)
+        {
+            this.uvs[i, 0] = uvs[i].x;
+            this.uvs[i, 1] = uvs[i].y;
         }
 
         //constructing int[]
