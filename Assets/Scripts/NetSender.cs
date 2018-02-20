@@ -151,9 +151,11 @@ public class NetSender : MonoBehaviour {
                 Debug.Log(genTriangles.Length);
 
                 //creating mesh with the generated vertices and triangles
-                Mesh genMesh = new Mesh();
-                genMesh.vertices = genVertices;
-                genMesh.triangles = genTriangles;
+                Mesh genMesh = new Mesh
+                {
+                    vertices = genVertices,
+                    triangles = genTriangles
+                };
 
                 //calculating mesh properties for rendering purposes
                 genMesh.RecalculateNormals();
@@ -161,7 +163,11 @@ public class NetSender : MonoBehaviour {
                 genMesh.RecalculateTangents();
 
                 //Adding generated mesh to container game object
-                GameObject genGo = new GameObject();
+                GameObject genGo = new GameObject
+                {
+                    name = "generatedModel",
+                    tag = "model",
+                };
                 MeshFilter genGoMeshFilter = genGo.AddComponent<MeshFilter>();
                 genGoMeshFilter.mesh = genMesh;
 
@@ -170,11 +176,20 @@ public class NetSender : MonoBehaviour {
 
                 //Generate new empty material with standard shader.
                 Material genMaterial = genGoMeshRenderer.material = new Material(Shader.Find("Standard"));
+                genMaterial.name = "generatedMaterial";
                 //Generate colour from float array [r=0, g=1, b=2, g=3]
                 Color genColour = new Color(modelWireData.materialColour[0], modelWireData.materialColour[1], modelWireData.materialColour[2], modelWireData.materialColour[3]);
                 genMaterial.color = genColour;
                 genMaterial.SetFloat("_Glossiness", modelWireData.materialGlossiness);
                 genMaterial.SetFloat("_Metallic", modelWireData.materialMetallic);
+
+                
+                byte[] texBytes = modelWireData.textureData;
+                TextureFormat textureFormat = (TextureFormat)modelWireData.textureFormat;
+                Texture2D genTex2D = new Texture2D(modelWireData.textureWidth, modelWireData.textureHeight, textureFormat, false);
+                genTex2D.LoadRawTextureData(texBytes);
+                Debug.Log("generated texture" + genTex2D.width + " " + genTex2D.height);
+                genMaterial.mainTexture = genTex2D;
             }
         }
     }
@@ -211,9 +226,20 @@ public class NetSender : MonoBehaviour {
         float materialGlossiness = material.GetFloat("_Glossiness");
         float materialMetallic= material.GetFloat("_Metallic");
 
-        ModelWireData meshWireData = new ModelWireData(mesh.vertices, mesh.triangles, materialColour, materialGlossiness, materialMetallic);
+        Texture2D texture2D = (Texture2D)material.mainTexture;
+        int textureWidth = texture2D.width;
+        int textureHeight = texture2D.height;
+        TextureFormat textureFormat = texture2D.format;
+        byte[] textureData = texture2D.GetRawTextureData();
 
-        byte[] data = Serialize(meshWireData);
+        //TODO Need to include the texture settings so the logo etc. can get mapped properly
+        //TODO: Also need to include the model UV (at the moment just the first for texture
+        // ... mapping.
+
+        //Construct modelWireData from the properties extracted.
+        ModelWireData modelWireData = new ModelWireData(mesh.vertices, mesh.triangles, materialColour, materialGlossiness, materialMetallic, textureData, textureWidth, textureHeight, textureFormat);
+
+        byte[] data = Serialize(modelWireData);
 
         Debug.Log("data size " + data.Length);
 
@@ -267,7 +293,13 @@ public class ModelWireData
     [SerializeField]
     public float materialGlossiness, materialMetallic;
 
-    public ModelWireData(Vector3[] vertices, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic)
+    [SerializeField]
+    public byte[] textureData;
+
+    [SerializeField]
+    public int textureWidth, textureHeight, textureFormat;
+
+    public ModelWireData(Vector3[] vertices, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic, byte[] textureData, int textureWidth, int textureHeight, TextureFormat textureFormat)
     {
         //Mesh Parameters
         //creating 2d float array for v3s
@@ -296,6 +328,12 @@ public class ModelWireData
         this.materialColour = materialColour;
         this.materialGlossiness = materialGlossiness;
         this.materialMetallic = materialMetallic;
+
+        this.textureData = textureData;
+        this.textureWidth = textureWidth;
+        this.textureHeight = textureHeight;
+
+        this.textureFormat = (int)textureFormat;
     }
 }
 
