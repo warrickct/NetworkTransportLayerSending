@@ -24,7 +24,7 @@ public class NetSender : MonoBehaviour {
     const int ChunkSize = 1024;
 
     int hostId;
-    int connectionId;
+    static int connectionId;
     int myReliableSequencedChannelId;
     int myStringSendingChannel;
 
@@ -268,6 +268,12 @@ public class NetSender : MonoBehaviour {
         NetworkTransport.Send(hostId, connectionId, myReliableSequencedChannelId, fragment, fragment.Length, out error);
     }
 
+    /// <summary>
+    /// Converts a serializable class into byte[]
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="arg"></param>
+    /// <returns></returns>
     public static byte[] Serialize<T>(T arg)
     {
         BinaryFormatter bf = new BinaryFormatter();
