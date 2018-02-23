@@ -8,6 +8,8 @@ using UnityEngine.Networking;
 
 public class DataTransmission : MonoBehaviour {
 
+    #region Class Fields
+
     public GameObject modelToSend;
 
     public Transform head;
@@ -19,6 +21,10 @@ public class DataTransmission : MonoBehaviour {
     public const int ChunkSize = 1024;
 
     public NetworkTransportManager netTransportManager;
+
+    #endregion
+
+    #region Unity Events
 
     private void Start()
     {
@@ -32,15 +38,15 @@ public class DataTransmission : MonoBehaviour {
         SendPlayerPosition();
     }
 
+    #endregion
+
+    #region Network Sending
+
     private void SendPlayerPosition()
     {
         TransformWireData transformWireDataHead = new TransformWireData(head);
-        Debug.Log("head" + transformWireDataHead.ToString());
         TransformWireData transformWireDataLeft = new TransformWireData(leftHand);
-        Debug.Log("left" + transformWireDataLeft.ToString());
         TransformWireData transformWireDataRight = new TransformWireData(rightHand);
-        Debug.Log("right" + transformWireDataRight.ToString());
-
 
         string playerDeviceId = SystemInfo.deviceUniqueIdentifier;
         PlayerWireData playerWireData = new PlayerWireData(playerDeviceId, transformWireDataHead, transformWireDataLeft, transformWireDataRight);
@@ -73,6 +79,10 @@ public class DataTransmission : MonoBehaviour {
         netTransportManager.SendReliableData(data);
     }
 
+    #endregion
+
+    #region Network Event Handling
+
     void ReceiveData()
     {
         int outHostId;
@@ -87,10 +97,10 @@ public class DataTransmission : MonoBehaviour {
         switch (evnt)
         {
             case NetworkEventType.ConnectEvent:
-                Debug.Log("connected");
+                OnConnect(outHostId, outConnectionId, outChannelId, (NetworkError)error);
                 break;
             case NetworkEventType.DataEvent:
-                HandleData(outHostId, outConnectionId, outChannelId, buffer, receiveSize, (NetworkError)error);
+                OnData(outHostId, outConnectionId, outChannelId, buffer, receiveSize, (NetworkError)error);
                 break;
             case NetworkEventType.DisconnectEvent:
                 Debug.Log("Disconnect event");
@@ -99,7 +109,7 @@ public class DataTransmission : MonoBehaviour {
     }
 
     List<byte> receivedBytes = new List<byte>();
-    public void HandleData(int hostId, int connId, int chanId, byte[] data, int dataSize, NetworkError error)
+    public void OnData(int hostId, int connId, int chanId, byte[] data, int dataSize, NetworkError error)
     {
         if (chanId == netTransportManager.reliableFragmentedSequencedChannelId)
         {
@@ -211,4 +221,24 @@ public class DataTransmission : MonoBehaviour {
             }
         }
     }
+
+    public void OnConnect(int hostId, int connId, int chanId, NetworkError error)
+    {
+        string s1 = string.Empty;
+        if (error == NetworkError.Ok)
+        {
+            s1 = "Connection success";
+        }
+        else
+        {
+            s1 = "Connection fail";
+
+        }
+        string s2 = string.Format("{0}. Host {1}, Connection {2}, Channel {3}", s1, hostId, connId, chanId);
+
+        Debug.Log(s2);
+    }
+
+    #endregion
+
 }

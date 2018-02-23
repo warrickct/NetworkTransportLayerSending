@@ -9,9 +9,11 @@ using UnityEngine.Networking;
 
 public class NetworkTransportManager : MonoBehaviour {
 
+    #region Class Fields
+
     public int port;
     public string targetIp;
-    
+
     public int hostId;
     public int connId;
 
@@ -20,16 +22,21 @@ public class NetworkTransportManager : MonoBehaviour {
 
     public const int ChunkSize = 1024;
 
+    #endregion
+
+    #region Pubilc Functions
+
     public void StartHost()
     {
         NetworkTransport.Init();
 
         //setting up config for large files.
-        ConnectionConfig config = new ConnectionConfig();
-        config.PacketSize = 1400;
-        config.MaxSentMessageQueueSize = 256;
-        config.FragmentSize = 1024;
-        
+        ConnectionConfig config = new ConnectionConfig
+        {
+            PacketSize = 1400,
+            MaxSentMessageQueueSize = 256,
+            FragmentSize = 1024
+        };
 
         unreliableChannelId = config.AddChannel(QosType.Unreliable);
         reliableFragmentedSequencedChannelId = config.AddChannel(QosType.ReliableFragmentedSequenced);
@@ -69,6 +76,10 @@ public class NetworkTransportManager : MonoBehaviour {
         NetworkTransport.Send(hostId, connId, reliableFragmentedSequencedChannelId, fragment, fragment.Length, out error);
     }
 
+    #endregion
+
+    #region Static Functions
+
     public static byte[] Serialize<T>(T arg)
     {
         BinaryFormatter bf = new BinaryFormatter();
@@ -77,4 +88,7 @@ public class NetworkTransportManager : MonoBehaviour {
         byte[] data = ms.ToArray();
         return data;
     }
+
+    #endregion
+
 }

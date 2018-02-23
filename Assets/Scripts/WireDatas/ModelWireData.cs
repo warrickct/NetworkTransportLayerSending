@@ -66,8 +66,9 @@ public class ModelWireData : TransformWireData
         }
 
         //confirmation constructor worked.
-        Debug.Log(this.vertices.Length);
-        Debug.Log(this.triangles.Length);
+        Debug.Log("Finished constructing vertices of length: " + this.vertices.Length);
+        Debug.Log("Finished constructing uv of length: " + this.uvs.Length);
+        Debug.Log("Finished constructing triangles of length: " + this.triangles.Length);
 
         //Material Parameters
         this.materialColour = materialColour;
