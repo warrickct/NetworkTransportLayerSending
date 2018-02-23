@@ -10,7 +10,8 @@ public class DataTransmission : MonoBehaviour {
 
     #region Class Fields
 
-    public GameObject modelToSend;
+    //Model referenced by button in unity inspector
+    //public GameObject modelToSend;
 
     public Transform head;
     public Transform leftHand;
@@ -55,7 +56,7 @@ public class DataTransmission : MonoBehaviour {
         netTransportManager.SendUnreliableData(data);
     }
 
-    public void SendModel()
+    public void SendModel(GameObject modelToSend)
     {
         // Extracting mesh to use in constructor
         Mesh mesh = modelToSend.GetComponent<MeshFilter>().mesh;
@@ -77,6 +78,16 @@ public class DataTransmission : MonoBehaviour {
 
         byte[] data = NetworkTransportManager.Serialize(modelWireData);
         netTransportManager.SendReliableData(data);
+    }
+
+    public void SendAllModels()
+    {
+        GameObject[] allModels = GameObject.FindGameObjectsWithTag("Model");
+
+        foreach(GameObject model in allModels)
+        {
+            SendModel(model);
+        }
     }
 
     #endregion
@@ -127,6 +138,7 @@ public class DataTransmission : MonoBehaviour {
                 Debug.Log(modelWireData.trianglesLength);
 
                 //loop 2d float array, make into vectors and add to new vertices array
+                //genVert is size of the v3[] length metadata of the modelWireData object. Not the size of the 2d float array.
                 Vector3[] genVertices = new Vector3[modelWireData.verticesLength];
                 for (int i = 0; i < modelWireData.verticesLength; i++)
                 {
@@ -187,7 +199,7 @@ public class DataTransmission : MonoBehaviour {
                 TextureFormat textureFormat = (TextureFormat)modelWireData.textureFormat;
                 Texture2D genTex2D = new Texture2D(modelWireData.textureWidth, modelWireData.textureHeight, textureFormat, false);
                 genTex2D.LoadRawTextureData(texBytes);
-                Debug.Log("generated texture" + genTex2D.width + " " + genTex2D.height);
+                Debug.Log("generated texture " + genTex2D.width + " x " + genTex2D.height);
                 genMaterial.mainTexture = genTex2D;
                 genTex2D.Apply();
 
