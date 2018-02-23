@@ -35,8 +35,12 @@ public class DataTransmission : MonoBehaviour {
     private void SendPlayerPosition()
     {
         TransformWireData transformWireDataHead = new TransformWireData(head);
+        Debug.Log("head" + transformWireDataHead.ToString());
         TransformWireData transformWireDataLeft = new TransformWireData(leftHand);
+        Debug.Log("left" + transformWireDataLeft.ToString());
         TransformWireData transformWireDataRight = new TransformWireData(rightHand);
+        Debug.Log("right" + transformWireDataRight.ToString());
+
 
         string playerDeviceId = SystemInfo.deviceUniqueIdentifier;
         PlayerWireData playerWireData = new PlayerWireData(playerDeviceId, transformWireDataHead, transformWireDataLeft, transformWireDataRight);

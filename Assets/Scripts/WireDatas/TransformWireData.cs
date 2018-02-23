@@ -14,9 +14,9 @@ public class TransformWireData
         this.posX = transform.position.x;
         this.posY = transform.position.y;
         this.posZ = transform.position.z;
-        this.rotX = transform.rotation.x;
-        this.rotY = transform.rotation.y;
-        this.rotZ = transform.rotation.z;
+        this.rotX = transform.rotation.eulerAngles.x;
+        this.rotY = transform.rotation.eulerAngles.y;
+        this.rotZ = transform.rotation.eulerAngles.z;
         this.scaX = transform.localScale.x;
         this.scaY = transform.localScale.y;
         this.scaZ = transform.localScale.z;
@@ -35,7 +35,7 @@ public class TransformWireData
 
         Vector3 v3rotation = new Vector3(transformWireData.rotX, transformWireData.rotY, transformWireData.rotZ);
         Quaternion newRotation = Quaternion.Euler(v3rotation);
-        transformTarget.localRotation = newRotation;
+        transformTarget.rotation = newRotation;
 
         if (includeScale)
         {
