@@ -6,6 +6,9 @@ using UnityEngine;
 [Serializable]
 public class ModelWireData : TransformWireData
 {
+    [SerializeField]
+    public string name;
+
     //Mesh
     [SerializeField]
     public int verticesLength, trianglesLength, uvsLength;
@@ -35,7 +38,7 @@ public class ModelWireData : TransformWireData
     [SerializeField]
     public TransformWireData transform;
 
-    public ModelWireData(Vector3[] vertices, Vector2[] uvs, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic, byte[] textureData, int textureWidth, int textureHeight, TextureFormat textureFormat, Transform transform) : base (transform)
+    public ModelWireData(Vector3[] vertices, Vector2[] uvs, int[] triangles, float[] materialColour, float materialGlossiness, float materialMetallic, byte[] textureData, int textureWidth, int textureHeight, TextureFormat textureFormat, string name, Transform transform) : base (transform)
     {
         //Mesh Parameters
         //creating 2d float array for v3s
@@ -80,6 +83,9 @@ public class ModelWireData : TransformWireData
         this.textureHeight = textureHeight;
 
         this.textureFormat = (int)textureFormat;
+
+        //model name for checking if present
+        this.name = name;
 
         //transform
         this.transform = new TransformWireData(transform);

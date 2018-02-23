@@ -74,7 +74,7 @@ public class DataTransmission : MonoBehaviour {
         byte[] textureData = texture2D.GetRawTextureData();
 
         //Construct modelWireData from the properties extracted.
-        ModelWireData modelWireData = new ModelWireData(mesh.vertices, mesh.uv, mesh.triangles, materialColour, materialGlossiness, materialMetallic, textureData, textureWidth, textureHeight, textureFormat, modelToSend.transform);
+        ModelWireData modelWireData = new ModelWireData(mesh.vertices, mesh.uv, mesh.triangles, materialColour, materialGlossiness, materialMetallic, textureData, textureWidth, textureHeight, textureFormat, modelToSend.name, modelToSend.transform);
 
         byte[] data = NetworkTransportManager.Serialize(modelWireData);
         netTransportManager.SendReliableData(data);
@@ -137,6 +137,12 @@ public class DataTransmission : MonoBehaviour {
                 Debug.Log(modelWireData.verticesLength);
                 Debug.Log(modelWireData.trianglesLength);
 
+                if (GameObject.Find(modelWireData.name))
+                {
+                    Debug.Log("model already exists locally. No generation required");
+                    return;
+                }
+
                 //loop 2d float array, make into vectors and add to new vertices array
                 //genVert is size of the v3[] length metadata of the modelWireData object. Not the size of the 2d float array.
                 Vector3[] genVertices = new Vector3[modelWireData.verticesLength];
@@ -176,7 +182,7 @@ public class DataTransmission : MonoBehaviour {
                 //Adding generated mesh to container game object
                 GameObject genGo = new GameObject
                 {
-                    name = "GeneratedModel",
+                    name = modelWireData.name,
                     tag = "Model"
                 };
                 MeshFilter genGoMeshFilter = genGo.AddComponent<MeshFilter>();
